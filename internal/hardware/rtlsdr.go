@@ -1,7 +1,8 @@
 package hardware
 
 /*
-#cgo LDFLAGS: -lrtlsdr
+#cgo LDFLAGS: -lrtlsdr -L/opt/homebrew/lib
+#cgo CFLAGS: -I/opt/homebrew/include
 #include <rtl-sdr.h>
 #include <stdlib.h>
 */
@@ -13,6 +14,8 @@ import (
 	"fmt"
 	"unsafe"
 )
+
+var ErrRead = errors.New("read error")
 
 type Device struct {
 	dev *C.rtlsdr_dev_t // Il puntatore opaco C al dispositivo RTL-SDR
@@ -77,6 +80,24 @@ func (d *Device) ReadBlock(size int) ([]byte, error) {
 
 	// Restituiamo il buffer Go, tagliato alla quantità di byte effettivamente letti dal C
 	return buf[:int(nRead)], nil
+}
+
+func (d *Device) ReadBlockInto(buf []byte) (int, error) {
+	if len(buf) == 0 {
+		return 0, nil
+	}
+	var nRead C.int
+	res := C.rtlsdr_read_sync(
+		d.dev,
+		unsafe.Pointer(&buf[0]),
+		C.int(len(buf)),
+		&nRead,
+	)
+	if res < 0 {
+		return 0, ErrRead
+	}
+
+	return int(nRead), nil
 }
 
 // Close chiude la connessione con l'hardware e rilascia la memoria USB

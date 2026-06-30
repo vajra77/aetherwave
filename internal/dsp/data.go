@@ -83,9 +83,9 @@ func (s Sample) Scale(factor float32) Sample {
 	return Sample(complex64(s) * complex(factor, 0))
 }
 
-// --- SignalBuffer ---
+// --- Signal ---
 
-type SignalBuffer struct {
+type Signal struct {
 	size       int
 	sampleRate SampleRate
 	centerFreq Frequency
@@ -93,8 +93,8 @@ type SignalBuffer struct {
 	spectrum   []float32
 }
 
-func NewSignalBuffer(size int, sampleRate SampleRate, centerFreq Frequency) *SignalBuffer {
-	return &SignalBuffer{
+func NewSignal(size int, sampleRate SampleRate, centerFreq Frequency) *Signal {
+	return &Signal{
 		size:       size,
 		sampleRate: sampleRate,
 		centerFreq: centerFreq,
@@ -102,13 +102,13 @@ func NewSignalBuffer(size int, sampleRate SampleRate, centerFreq Frequency) *Sig
 	}
 }
 
-func NewSignalBufferFromRawBytes(rate SampleRate, freq Frequency, raw []byte) (*SignalBuffer, error) {
+func NewSignalFromRawBytes(rate SampleRate, freq Frequency, raw []byte) (*Signal, error) {
 	nSamples := len(raw) / 2
 	if nSamples == 0 || (nSamples&(nSamples-1)) != 0 {
 		return nil, ErrNotPowerOfTwo
 	}
 
-	buf := NewSignalBuffer(nSamples, rate, freq)
+	buf := NewSignal(nSamples, rate, freq)
 
 	for i := 0; i < len(raw); i += 2 {
 		iFloat := (float32(raw[i]) - 127.5) / 127.5
@@ -118,9 +118,9 @@ func NewSignalBufferFromRawBytes(rate SampleRate, freq Frequency, raw []byte) (*
 	return buf, nil
 }
 
-func (sb *SignalBuffer) Size() int                 { return sb.size }
-func (sb *SignalBuffer) SampleRate() SampleRate    { return sb.sampleRate }
-func (sb *SignalBuffer) CenterFreq() Frequency     { return sb.centerFreq }
-func (sb *SignalBuffer) Samples() []Sample         { return sb.samples }
-func (sb *SignalBuffer) GetSample(n int) Sample    { return sb.samples[n] }
-func (sb *SignalBuffer) SetSample(n int, s Sample) { sb.samples[n] = s }
+func (sb *Signal) Size() int                 { return sb.size }
+func (sb *Signal) SampleRate() SampleRate    { return sb.sampleRate }
+func (sb *Signal) CenterFreq() Frequency     { return sb.centerFreq }
+func (sb *Signal) Samples() []Sample         { return sb.samples }
+func (sb *Signal) GetSample(n int) Sample    { return sb.samples[n] }
+func (sb *Signal) SetSample(n int, s Sample) { sb.samples[n] = s }

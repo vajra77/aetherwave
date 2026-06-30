@@ -14,7 +14,7 @@ func NewFM() *FMDemodulator {
 	return &FMDemodulator{}
 }
 
-func (fm *FMDemodulator) Process(in *dsp.SignalBuffer) []audio.Sample {
+func (fm *FMDemodulator) Process(in *dsp.Signal) []audio.Sample {
 	nSamples := in.Size()
 	samples := in.Samples()
 	audioOut := make([]audio.Sample, nSamples)

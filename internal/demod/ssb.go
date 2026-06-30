@@ -19,7 +19,7 @@ func NewSSB(mode string, sampleRate dsp.SampleRate) *SSBDemodulator {
 	}
 }
 
-func (s *SSBDemodulator) Demodulate(in *dsp.SignalBuffer) []audio.Sample {
+func (s *SSBDemodulator) Demodulate(in *dsp.Signal) []audio.Sample {
 	nSamples := in.Size()
 	samples := in.Samples()
 	audioOut := make([]audio.Sample, nSamples)

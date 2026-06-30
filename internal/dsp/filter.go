@@ -44,12 +44,12 @@ func ComputeLowPassTaps(numTaps int, cutoffFreq float64) []float32 {
 	return taps
 }
 
-func (f *FIRFilter) Process(input *SignalBuffer) *SignalBuffer {
+func (f *FIRFilter) Process(input *Signal) *Signal {
 	numSamples := input.Size()
 	numTaps := len(f.taps)
 
 	// Creiamo il buffer di uscita con gli stessi metadati di frequenza e sample rate
-	output := NewSignalBuffer(numSamples, input.SampleRate(), input.CenterFreq())
+	output := NewSignal(numSamples, input.SampleRate(), input.CenterFreq())
 
 	// Per ogni campione nel buffer in ingresso
 	for n := 0; n < numSamples; n++ {

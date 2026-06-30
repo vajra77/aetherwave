@@ -89,7 +89,7 @@ func FFTi(x []Sample) {
 	}
 }
 
-func ComputeSpectrum(sb *SignalBuffer) []DBPower {
+func ComputeSpectrum(sb *Signal) []DBPower {
 	N := int(sb.Size())
 
 	// Creiamo un array di lavoro temporaneo (questa sarà l'unica vera allocazione)

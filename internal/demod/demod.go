@@ -6,5 +6,5 @@ import (
 ) // Ora importa dsp invece di iq
 
 type Demodulator interface {
-	Process(in *dsp.SignalBuffer) []audio.Sample
+	Process(in *dsp.Signal) []audio.Sample
 }

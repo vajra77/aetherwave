@@ -17,8 +17,8 @@ func NewAM() *AMDemodulator {
 	}
 }
 
-// Demodulate prende il SignalBuffer (I/Q ad alta frequenza) e restituisce l'audio reale
-func (am *AMDemodulator) Process(in *dsp.SignalBuffer) []audio.Sample {
+// Demodulate prende il Signal (I/Q ad alta frequenza) e restituisce l'audio reale
+func (am *AMDemodulator) Process(in *dsp.Signal) []audio.Sample {
 	nSamples := in.Size()
 	samples := in.Samples()
 

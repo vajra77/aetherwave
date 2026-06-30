@@ -21,7 +21,7 @@ func NewCW(sampleRate dsp.SampleRate, toneHz float64) *CWDemodulator {
 	}
 }
 
-func (cw *CWDemodulator) Demodulate(in *dsp.SignalBuffer) []audio.Sample {
+func (cw *CWDemodulator) Demodulate(in *dsp.Signal) []audio.Sample {
 	nSamples := in.Size()
 	samples := in.Samples()
 	audioOut := make([]audio.Sample, nSamples)
