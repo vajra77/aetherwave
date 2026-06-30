@@ -96,7 +96,7 @@ func (sb *SignalBuffer) Samples() []IQSample         { return sb.samples }
 func (sb *SignalBuffer) GetSample(n int) IQSample    { return sb.samples[n] }
 func (sb *SignalBuffer) SetSample(n int, s IQSample) { sb.samples[n] = s }
 
-func (sb *SignalBuffer) ComputeSpectrum() []float32 {
+func (sb *SignalBuffer) Spectrum() []float32 {
 	N := int(sb.Size())
 
 	// Creiamo un array di lavoro temporaneo (questa sarà l'unica vera allocazione)
