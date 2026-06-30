@@ -5,6 +5,10 @@ import (
 	"aetherwave/internal/audio"
 	"aetherwave/internal/dsp"
 	"aetherwave/internal/radio"
+	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
 )
 
 type listenCmd struct {
@@ -31,14 +35,31 @@ func (c *listenCmd) Run() {
 		c.config.Mode,
 	)
 
-	// 2. Avvia il flusso in background
-	rcvr.Start()
+	player, err := audio.NewPlayer(48000, rcvr.AudioChannel())
+	if err != nil {
+		fmt.Printf("❌ Audio Error: %v\n", err)
+		return
+	}
+	defer player.Close()
+
+	// 4. Avviamo i motori!
+	if err := rcvr.Start(); err != nil {
+		fmt.Printf("❌ SDR HW Error: %v\n", err)
+		return
+	}
 	defer rcvr.Stop()
 
-	// 3. La CLI è interessata solo a suonare l'audio, quindi svuota il canale audio nel player
-	player, _ := audio.New()
-
-	for audioData := range rcvr.AudioChannel() {
-		player.Play(audioData)
+	if err := player.Start(); err != nil {
+		fmt.Printf("❌ Audio Start Error: %v\n", err)
+		return
 	}
+
+	fmt.Println("🎶 Radio is playing, press CTRL+C to stop.")
+
+	// 5. Mettiamo il main thread in attesa del segnale di chiusura del sistema (CTRL+C)
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	<-sigChan
+
+	fmt.Println("\nRadio shutting off, thank you for listening! 👋")
 }
