@@ -1,8 +1,10 @@
 package demod
 
-import "aetherwave/internal/dsp" // Ora importa dsp invece di iq
+import (
+	"aetherwave/internal/audio"
+	"aetherwave/internal/dsp"
+) // Ora importa dsp invece di iq
 
 type Demodulator interface {
-	// Accetta il buffer definito dentro il pacchetto dsp
-	Demodulate(in *dsp.SignalBuffer) []float32
+	Process(in *dsp.SignalBuffer) []audio.Sample
 }

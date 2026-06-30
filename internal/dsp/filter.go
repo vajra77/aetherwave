@@ -6,17 +6,17 @@ import (
 
 type FIRFilter struct {
 	taps    []float32
-	history []IQSample
+	history []Sample
 }
 
-func NewLowPassFilter(numTaps int, sampleRate uint32, cutoffFreqHz uint32) *FIRFilter {
+func NewLowPassFilter(numTaps int, sampleRate SampleRate, cutoffFreqHz Frequency) *FIRFilter {
 	// Usa le funzioni matematiche interne allo stesso pacchetto dsp per calcolare i taps
 	normCutoff := float64(cutoffFreqHz) / float64(sampleRate)
 	taps := ComputeLowPassTaps(numTaps, normCutoff)
 
 	return &FIRFilter{
 		taps:    taps,
-		history: make([]IQSample, numTaps),
+		history: make([]Sample, numTaps),
 	}
 }
 
@@ -45,20 +45,20 @@ func ComputeLowPassTaps(numTaps int, cutoffFreq float64) []float32 {
 }
 
 func (f *FIRFilter) Process(input *SignalBuffer) *SignalBuffer {
-	numIQSamples := input.Size()
+	numSamples := input.Size()
 	numTaps := len(f.taps)
 
 	// Creiamo il buffer di uscita con gli stessi metadati di frequenza e sample rate
-	output := NewSignalBuffer(numIQSamples, input.IQSampleRate(), input.CenterFreq())
+	output := NewSignalBuffer(numSamples, input.SampleRate(), input.CenterFreq())
 
 	// Per ogni campione nel buffer in ingresso
-	for n := 0; n < numIQSamples; n++ {
+	for n := 0; n < numSamples; n++ {
 		// 1. Spostiamo la storia della delay line (scorriamo i vecchi campioni)
 		copy(f.history[1:], f.history[:numTaps-1])
 		f.history[0] = input.GetSample(n) // Il campione attuale diventa il più recente
 
 		// 2. Eseguiamo la Convoluzione (Moltiplica e Accumula)
-		var acc IQSample // Inizia a (0,0) grazie al tipo di Go
+		var acc Sample // Inizia a (0,0) grazie al tipo di Go
 		for k := 0; k < numTaps; k++ {
 			// Moltiplichiamo il campione storico per lo scalare del tap corrispondente
 			scaled := f.history[k].Scale(f.taps[k])
@@ -70,4 +70,16 @@ func (f *FIRFilter) Process(input *SignalBuffer) *SignalBuffer {
 	}
 
 	return output
+}
+
+// SetCutoff permette di cambiare la frequenza di taglio del filtro a runtime.
+func (f *FIRFilter) SetCutoff(sampleRate SampleRate, newCutoffHz Frequency) {
+	// Ricalcoliamo la frequenza normalizzata
+	normCutoff := float64(newCutoffHz) / float64(sampleRate)
+
+	// Generiamo i nuovi coefficienti usando la funzione matematica pura che abbiamo in dsp
+	newTaps := ComputeLowPassTaps(len(f.taps), normCutoff)
+
+	// Sostituiamo i taps in modo atomico
+	f.taps = newTaps
 }

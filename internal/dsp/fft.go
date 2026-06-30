@@ -4,9 +4,11 @@ import (
 	"math"
 )
 
+type DBPower float32
+
 // FFTr è il motore ricorsivo della FFT.
-// Lavora direttamente sugli IQSample sfruttando la loro astrazione.
-func FFTr(x []IQSample) []IQSample {
+// Lavora direttamente sugli Sample sfruttando la loro astrazione.
+func FFTr(x []Sample) []Sample {
 	N := len(x)
 
 	if N <= 1 {
@@ -14,8 +16,8 @@ func FFTr(x []IQSample) []IQSample {
 	}
 
 	// 1. Divide: separa gli indici even dai odd
-	even := make([]IQSample, N/2)
-	odd := make([]IQSample, N/2)
+	even := make([]Sample, N/2)
+	odd := make([]Sample, N/2)
 	for i := 0; i < N/2; i++ {
 		even[i] = x[2*i]
 		odd[i] = x[2*i+1]
@@ -26,13 +28,13 @@ func FFTr(x []IQSample) []IQSample {
 	fftOdd := FFTr(odd)
 
 	// 3. Combina: unisci i risultati usando i twiddle factors
-	X := make([]IQSample, N)
+	X := make([]Sample, N)
 	for k := 0; k < N/2; k++ {
 		angle := -2.0 * math.Pi * float64(k) / float64(N)
 
 		// Creiamo il twiddle factor sfruttando il costruttore del nostro tipo
 		// e^(-j*θ) = cos(θ) + j*sin(θ)
-		twiddle := NewIQSample(float32(math.Cos(angle)), float32(math.Sin(angle)))
+		twiddle := Sample(complex(float32(math.Cos(angle)), float32(math.Sin(angle))))
 
 		// Moltiplicazione complessa astratta: odd * twiddle
 		turnedOdd := fftOdd[k].Multiply(twiddle)
@@ -47,7 +49,7 @@ func FFTr(x []IQSample) []IQSample {
 
 // FFTi calcola la Fast Fourier Transform in-place (senza allocazioni ricorsive).
 // Modifica direttamente l'array passato in input. La dimensione deve essere una potenza di 2.
-func FFTi(x []IQSample) {
+func FFTi(x []Sample) {
 	n := len(x)
 	if n <= 1 {
 		return
@@ -70,7 +72,7 @@ func FFTi(x []IQSample) {
 				angle := float64(k) * angleStep
 
 				// Generiamo il twiddle factor
-				twiddle := NewIQSample(float32(math.Cos(angle)), float32(math.Sin(angle)))
+				twiddle := Sample(complex(float32(math.Cos(angle)), float32(math.Sin(angle))))
 
 				// Indici dei due elementi che si incrociano nella farfalla
 				idxPari := i + k
@@ -87,8 +89,37 @@ func FFTi(x []IQSample) {
 	}
 }
 
+func ComputeSpectrum(sb *SignalBuffer) []DBPower {
+	N := int(sb.Size())
+
+	// Creiamo un array di lavoro temporaneo (questa sarà l'unica vera allocazione)
+	workingSamples := make([]Sample, N)
+	for n := 0; n < N; n++ {
+		hann := float32(0.5 * (1.0 - math.Cos(2.0*math.Pi*float64(n)/float64(N-1))))
+		workingSamples[n] = sb.samples[n].Scale(hann)
+	}
+
+	// Eseguiamo la FFT in-place sull'array di lavoro
+	FFTi(workingSamples)
+
+	// Da qui in poi la logica del tuo Shift e dei Decibel rimane identica
+	shiftedResult := make([]Sample, N)
+	mid := N / 2
+	for i := 0; i < N; i++ {
+		shiftedResult[(i+mid)%N] = workingSamples[i]
+	}
+
+	spectrum := make([]DBPower, N)
+	for i := 0; i < N; i++ {
+		mag := shiftedResult[i].Magnitude()
+		spectrum[i] = DBPower(20 * float32(math.Log10(float64(mag)+1e-10)))
+	}
+
+	return spectrum
+}
+
 // bitReverseReorder riordina lo slice in-place invertendo i bit degli indici.
-func bitReverseReorder(x []IQSample) {
+func bitReverseReorder(x []Sample) {
 	n := len(x)
 	j := 0
 	for i := 0; i < n; i++ {
