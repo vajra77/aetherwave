@@ -14,10 +14,9 @@ func NewFM() *FMDemodulator {
 	return &FMDemodulator{}
 }
 
-func (fm *FMDemodulator) Process(in *dsp.Signal) []audio.Sample {
+func (fm *FMDemodulator) Process(in *dsp.Signal, out []audio.Sample) {
 	nSamples := in.Size()
 	samples := in.Samples()
-	audioOut := make([]audio.Sample, nSamples)
 
 	for i := 0; i < nSamples; i++ {
 		// 1. Calcoliamo la fase istantanea del campione corrente
@@ -38,7 +37,7 @@ func (fm *FMDemodulator) Process(in *dsp.Signal) []audio.Sample {
 
 		// 4. Salviamo l'ampiezza dell'audio (la deviazione di frequenza è l'audio!)
 		// Normalizziamo dividendo per PI per avere un valore idealmente compreso tra -1.0 e 1.0
-		audioOut[i] = audio.Sample(phaseDiff / math.Pi)
+		out[i] = audio.Sample(phaseDiff / math.Pi)
 
 		// Conserviamo la fase corrente per il prossimo ciclo (o il prossimo blocco hardware)
 		fm.lastPhase = currentPhase
@@ -47,6 +46,4 @@ func (fm *FMDemodulator) Process(in *dsp.Signal) []audio.Sample {
 	// NOTA PER IL FUTURO: La FM commerciale ha una forte enfasi sulle alte frequenze
 	// all'emissione (Pre-emphasis). Per sentire la radio in modo perfetto, qui andrà
 	// applicato un filtro dsp molto semplice chiamato "De-emphasis" (un passa-basso leggero).
-
-	return audioOut
 }

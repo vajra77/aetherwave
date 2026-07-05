@@ -18,19 +18,17 @@ func NewAM() *AMDemodulator {
 }
 
 // Demodulate prende il Signal (I/Q ad alta frequenza) e restituisce l'audio reale
-func (am *AMDemodulator) Process(in *dsp.Signal) []audio.Sample {
+func (am *AMDemodulator) Process(in *dsp.Signal, out []audio.Sample) {
+	out = out[:cap(out)]
 	nSamples := in.Size()
 	samples := in.Samples()
-
-	// Allocchiamo l'array per i campioni audio in uscita (stessa lunghezza temporanea)
-	audioOut := make([]audio.Sample, nSamples)
 
 	// 1. Estrazione dell'inviluppo (Magnitude)
 	var sum float32
 	for i := 0; i < nSamples; i++ {
 		// Il metodo Magnitude() usa internamente i complessi nativi!
-		audioOut[i] = audio.Sample(samples[i].Magnitude())
-		sum += float32(audioOut[i])
+		out[i] = audio.Sample(samples[i].Magnitude())
+		sum += float32(out[i])
 	}
 
 	// 2. Rimozione della componente continua (DC Block)
@@ -40,9 +38,7 @@ func (am *AMDemodulator) Process(in *dsp.Signal) []audio.Sample {
 
 	for i := 0; i < nSamples; i++ {
 		// Sottraiamo la media per centrare il segnale audio sullo 0.0
-		audioOut[i] = audioOut[i].Sub(averageDC).Mul(gainSample)
-		audioOut[i] = audioOut[i].Clamp(audio.Sample(-1.0), audio.Sample(1.0))
+		out[i] = out[i].Sub(averageDC).Mul(gainSample)
+		out[i] = out[i].Clamp(audio.Sample(-1.0), audio.Sample(1.0))
 	}
-
-	return audioOut
 }

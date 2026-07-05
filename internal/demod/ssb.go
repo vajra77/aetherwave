@@ -19,10 +19,9 @@ func NewSSB(mode string, sampleRate dsp.SampleRate) *SSBDemodulator {
 	}
 }
 
-func (s *SSBDemodulator) Demodulate(in *dsp.Signal) []audio.Sample {
+func (s *SSBDemodulator) Process(in *dsp.Signal, out []audio.Sample) {
 	nSamples := in.Size()
 	samples := in.Samples()
-	audioOut := make([]audio.Sample, nSamples)
 
 	// Scegliamo di quanto "spostare" il segnale per far coincidere la banda laterale con l'audio udibile.
 	// Di solito per la SSB si sposta la frequenza di circa 1.5 kHz (0.0015 MHz) per centrare la voce.
@@ -43,7 +42,7 @@ func (s *SSBDemodulator) Demodulate(in *dsp.Signal) []audio.Sample {
 
 		// 3. Estrazione dell'audio: nella SSB, dopo aver centrato lo spettro,
 		// l'informazione audio reale si trova semplicemente nella PARTE REALE (I) del segnale complessivo!
-		audioOut[i] = audio.Sample(shiftedSample.I())
+		out[i] = audio.Sample(shiftedSample.I())
 
 		// Incrementiamo la fase della portante locale per il prossimo campione
 		s.phase += phaseStep
@@ -52,9 +51,7 @@ func (s *SSBDemodulator) Demodulate(in *dsp.Signal) []audio.Sample {
 		}
 	}
 
-	// NOTA: Per un lavoro perfetto, dopo questo ciclo l'array audioOut andrebbe
+	// NOTA: Per un lavoro perfetto, dopo questo ciclo l'array out andrebbe
 	// passato dentro un filtro FIR passa-basso molto stretto (es. 3 kHz) per tagliare
 	// i rimasugli dell'altra banda laterale.
-
-	return audioOut
 }

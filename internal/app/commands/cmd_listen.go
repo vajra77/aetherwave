@@ -31,10 +31,29 @@ func (c *listenCmd) Run() {
 	fmt.Println("🎶 Radio is starting, please wait...")
 	fmt.Printf("frequency: %d kHz\n", c.config.Frequency)
 	// 1. Configura la pipeline astratta
+
+	var profile *radio.Profile
+
+	switch c.config.Profile {
+	case "amw", "AMW":
+		profile = radio.Profiles[radio.AMW]
+	case "amn", "AMN":
+		profile = radio.Profiles[radio.AMN]
+	case "usb", "USB":
+		profile = radio.Profiles[radio.USB]
+	case "lsb", "LSB":
+		profile = radio.Profiles[radio.LSB]
+	case "cw", "CW":
+		profile = radio.Profiles[radio.CW]
+	case "wfm", "WFM":
+		profile = radio.Profiles[radio.WFM]
+	case "nfm", "NFM":
+		profile = radio.Profiles[radio.NFM]
+	}
+
 	rcvr := radio.NewReceiver(
 		dsp.Frequency(c.config.Frequency*1000),
-		dsp.SampleRate(250000),
-		c.config.Mode,
+		profile,
 	)
 
 	player, err := audio.NewPlayer(48000, rcvr.AudioChannel())

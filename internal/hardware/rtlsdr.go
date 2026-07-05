@@ -15,6 +15,10 @@ import (
 	"unsafe"
 )
 
+const DirectSamplingDisabled = 0
+const DirectSamplingIEnabled = 1
+const DirectSamplingQEnabled = 2
+
 var ErrRead = errors.New("read error")
 
 type Device struct {
@@ -33,6 +37,18 @@ func NewDevice(freq dsp.Frequency, sampleRate dsp.SampleRate) (*Device, error) {
 	}
 
 	d := &Device{dev: dev}
+
+	// Sotto i 28-30 MHz il sintonizzatore non arriva, attiviamo il Q-Branch automaticamente
+	if freq < 30000000 {
+		fmt.Println("📡 Requested frequency is below 30MHz, enabling Direct Sampling (Q-Branch)")
+		err := d.SetDirectSampling(2) // 2 = Q-Branch
+		if err != nil {
+			fmt.Printf("Error while enabling Direct Sampling: %v\n", err)
+		}
+	} else {
+		// Sopra i 30MHz ci assicuriamo che sia disattivato per usare il sintonizzatore R820T2
+		_ = d.SetDirectSampling(0)
+	}
 
 	// 2. Impostiamo la Frequenza Centrale
 	// C.uint32_t fa il cast dal tuo dsp.Frequency (uint64) al tipo richiesto dal C
@@ -56,6 +72,25 @@ func NewDevice(freq dsp.Frequency, sampleRate dsp.SampleRate) (*Device, error) {
 	C.rtlsdr_reset_buffer(d.dev)
 
 	return d, nil
+}
+
+// SetDirectSampling configura la modalità di campionamento diretto.
+// 0 = Off, 1 = I-Branch, 2 = Q-Branch
+func (d *Device) SetDirectSampling(mode int) error {
+	if d.dev == nil {
+		return errors.New("device is not initialized")
+	}
+
+	// Chiamata alla funzione Cgo nativa
+	res := C.rtlsdr_set_direct_sampling(d.dev, C.int(mode))
+	if res < 0 {
+		return fmt.Errorf("unable to set direct sampling (C code: %v)", res)
+	}
+
+	// Ogni volta che si cambia modalità strutturale all'hardware,
+	// è buona norma resettare i buffer per svuotare i dati della vecchia modalità
+	C.rtlsdr_reset_buffer(d.dev)
+	return nil
 }
 
 // ReadBlock riempie uno slice di byte in Go attingendo direttamente dalla memoria del C

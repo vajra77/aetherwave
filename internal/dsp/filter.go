@@ -44,18 +44,18 @@ func ComputeLowPassTaps(numTaps int, cutoffFreq float64) []float32 {
 	return taps
 }
 
-func (f *FIRFilter) Process(input *Signal) *Signal {
-	numSamples := input.Size()
+func (f *FIRFilter) Process(in *Signal, out *Signal) {
+	out.samples = out.samples[:cap(out.samples)]
+	numSamples := in.Size()
 	numTaps := len(f.taps)
 
 	// Creiamo il buffer di uscita con gli stessi metadati di frequenza e sample rate
-	output := NewSignal(numSamples, input.SampleRate(), input.CenterFreq())
 
 	// Per ogni campione nel buffer in ingresso
 	for n := 0; n < numSamples; n++ {
 		// 1. Spostiamo la storia della delay line (scorriamo i vecchi campioni)
 		copy(f.history[1:], f.history[:numTaps-1])
-		f.history[0] = input.GetSample(n) // Il campione attuale diventa il più recente
+		f.history[0] = in.GetSample(n) // Il campione attuale diventa il più recente
 
 		// 2. Eseguiamo la Convoluzione (Moltiplica e Accumula)
 		var acc Sample // Inizia a (0,0) grazie al tipo di Go
@@ -66,10 +66,10 @@ func (f *FIRFilter) Process(input *Signal) *Signal {
 		}
 
 		// Salviamo il risultato nel buffer di uscita
-		output.SetSample(n, acc)
+		out.SetSample(n, acc)
 	}
-
-	return output
+	out.samples = out.samples[:len(in.samples)]
+	out.size = numSamples
 }
 
 // SetCutoff permette di cambiare la frequenza di taglio del filtro a runtime.

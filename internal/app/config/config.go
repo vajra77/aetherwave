@@ -7,15 +7,15 @@ import (
 
 type Config struct {
 	Frequency uint64
-	Mode      string
+	Profile   string
 }
 
 func New() (*Config, error) {
 	config := Config{}
 
 	fs := flag.NewFlagSet("config", flag.ExitOnError)
-	fs.StringVar(&config.Mode, "mode", "AM", "Radio mode (AM, FM, USB, LSB, CW)")
-	fs.Uint64Var(&config.Frequency, "freq", 1000000, "Radio frequency")
+	fs.StringVar(&config.Profile, "profile", "AMW", "Radio mode (AMW, AMN, USB, LSB, CW, WFM, NFM)")
+	fs.Uint64Var(&config.Frequency, "freq", 1950, "Radio frequency in kHz")
 	if err := fs.Parse(os.Args[2:]); err != nil {
 		return nil, err
 	}

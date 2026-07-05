@@ -1,0 +1,94 @@
+[ MONDO REALE ]
+          │ (Onde Elettromagnetiche)
+          ▼
+   ┌──────────────┐
+   │ Antenna / HF │
+   └──────┬───────┘
+          │ (Segnale analogico RF)
+          ▼
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│ [ SERVER HARDWARE / CORRELAZIONE IN MEMORIA ]                                          │
+│                                                                                        │
+│ ┌──────────────────────┐   Direct Sampling (Q-Branch)  ┌─────────────────────────────┐ │
+│ │ Sintonizzatore       ├──────────────────────────────►│ ADC Chip                    │ │
+│ │ Rafael Micro R820T2 │ (Bypass sotto i 30MHz)        │ Realtek RTL2832U            │ │
+│ └──────────────────────┘                               └──────────────┬──────────────┘ │
+└───────────────────────────────────────────────────────────────────────┼────────────────┘
+                                                                        │ (Byte IQ grezzi a 8-bit)
+                                                                        │ [I, Q, I, Q, ...]
+                                                                        ▼
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│ [ STRUTTURA DI CONCORRENZA GO (RadioPipeline) ]                                        │
+│                                                                                        │
+│                      ┌─────────────────────────────────────────┐                       │
+│                      │          p.bufferPool (Canale)          │◄────────────────────┐ │
+│                      └────────────────────┬────────────────────┘                     │ │
+│                                           │                                          │ │
+│                                  Preleva  │ (Slice []byte vuoto, len=cap)            │ │
+│                                  Buffer   ▼                                          │ │
+│                      ┌─────────────────────────────────────────┐                     │ │
+│                      │ GOROUTINE 1: hardwareReaderLoop()       │                     │ │
+│                      │                                         │                     │ │
+│                      │ 1. Chiama Cgo: C.rtlsdr_read_sync()     │                     │ │
+│                      │ 2. Travasa i byte nel buffer estratto   │                     │ │
+│                      │ 3. Reslicing al numero di byte letti (n)│                     │ │
+│                      └────────────────────┬────────────────────┘                     │ │
+│                                           │                                          │ │
+│                                 Invia al  │ (Slice []byte pieno, len=n)              │ │
+│                                 DSP       ▼                                          │ │
+│                      ┌─────────────────────────────────────────┐                     │ │
+│                      │           p.rawIQChan (Canale)          │                     │ │
+│                      └────────────────────┬────────────────────┘                     │ │
+│                                           │                                          │ │
+│                                  Preleva  │ (Slice []byte pieno)                     │ │
+│                                  per DSP  ▼                                          │ │
+│                      ┌─────────────────────────────────────────┐                     │ │
+│                      │ GOROUTINE 2: dspProcessorLoop()         │                     │ │
+│                      │                                         │                     │ │
+│                      │  A. dsp.NewSignalBuffer()               │                     │ │
+│                      │     - Converte byte a float32 [-1, 1]   │                     │ │
+│                      │     - Crea array di dsp.Sample          │                     │ │
+│                      │                                         │                     │ │
+│                      │  B. p.filtroRadio.Process()             │                     │ │
+│                      │     - Convoluzione FIR nel dominio tempo│                     │ │
+│                      │     - Isola la banda desiderata (es 5kHz)│                     │ │
+│                      │                                         │                     │ │
+│                      │  C. p.demodulatore.Demodulate()         │                     │ │
+│                      │     - AM: Estratta la Magnitude()       │                     │ │
+│                      │     - Restituisce []audio.Sample        │                     │ │
+│                      │                                         │                     │ │
+│                      │  D. p.resampler.Process()               │                     │ │
+│                      │     - Riduce il rate da 1.024MHz        │                     │ │
+│                      │       a 48kHz (Decimazione)             │                     │ │
+│                      │                                         │                     │ │
+│                      │  E. Restituisce il buffer originale     ├─────────────────────┘ │
+│                      │     ricostruendo la cap:                │ (Sblocca la memoria)  │
+│                      │     p.bufferPool <- rawBytes[:cap]      │                       │
+│                      └────────────────────┬────────────────────┘                       │
+│                                           │                                            │
+│                                           │ (Stream continuo di []audio.Sample a 48kHz)│
+│                                           ▼                                            │
+│                      ┌─────────────────────────────────────────┐                       │
+│                      │          p.audioChan (Canale)           │                       │
+│                      └────────────────────┬────────────────────┘                       │
+└───────────────────────────────────────────┼────────────────────────────────────────────┘
+                                            │
+                                            │ (Lettura non bloccante elemento per elemento)
+                                            ▼
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│ [ SOTTOSISTEMA AUDIO NATIVO PC ]                                                       │
+│                                                                                        │
+│ ┌────────────────────────────────────────────────────────────────────────────────────┐ │
+│ │ GOROUTINE 3 / CALLBACK PORTAUDIO: processAudio(out []float32)                      │ │
+│ │                                                                                    │ │
+│ │ Loop su ogni elemento del buffer richiesto dalla scheda audio:                     │ │
+│ │ 1. Legge dal canale: `sample := <-p.audioChan`                                     │ │
+│ │ 2. Converte il tipo: `out[i] = float32(sample)`                                    │ │
+│ │ 3. Se il canale è vuoto scrive `0.0` (Evita l'effetto "Underrun"/Glitch)           │ │
+│ └─────────────────────────────────────────┬──────────────────────────────────────────┘ │
+└───────────────────────────────────────────┼────────────────────────────────────────────┘
+                                            │
+                                            ▼
+                                  ┌───────────────────┐
+                                  │ Cuffie / Altoparl │
+                                  └───────────────────┘

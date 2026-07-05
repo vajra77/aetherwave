@@ -3,6 +3,7 @@ package dsp
 import (
 	"errors"
 	"fmt"
+	"math"
 	"math/cmplx"
 )
 
@@ -10,7 +11,7 @@ var (
 	ErrNotPowerOfTwo = errors.New("size must be a power of two")
 )
 
-type Frequency uint64
+type Frequency float64
 type SampleRate uint32
 
 // ---- Metodi di utilità per Frequency ----
@@ -88,39 +89,74 @@ func (s Sample) Scale(factor float32) Sample {
 type Signal struct {
 	size       int
 	sampleRate SampleRate
-	centerFreq Frequency
 	samples    []Sample
 	spectrum   []float32
 }
 
-func NewSignal(size int, sampleRate SampleRate, centerFreq Frequency) *Signal {
-	return &Signal{
+func NewEmptySignal(sampleRate SampleRate, size int) *Signal {
+	return new(Signal{
 		size:       size,
 		sampleRate: sampleRate,
-		centerFreq: centerFreq,
 		samples:    make([]Sample, size),
+	})
+}
+
+func NewSignalFromSamples(sampleRate SampleRate, samples []Sample) *Signal {
+	return &Signal{
+		size:       len(samples),
+		sampleRate: sampleRate,
+		samples:    samples,
 	}
 }
 
-func NewSignalFromRawBytes(rate SampleRate, freq Frequency, raw []byte) (*Signal, error) {
+func DecimateRawBytesIntoSignal(inRate, tgtRate SampleRate, raw []byte, out *Signal) error {
+	out.samples = out.samples[:cap(out.samples)]
+
 	nSamples := len(raw) / 2
 	if nSamples == 0 || (nSamples&(nSamples-1)) != 0 {
-		return nil, ErrNotPowerOfTwo
+		return ErrNotPowerOfTwo
 	}
 
-	buf := NewSignal(nSamples, rate, freq)
+	decFactor := int(math.Round(float64(inRate) / float64(tgtRate)))
 
-	for i := 0; i < len(raw); i += 2 {
+	dstIdx := 0
+	step := 2 * decFactor
+	for i := 0; i < len(raw); i += step {
+		if i+1 >= len(raw) || dstIdx >= out.size {
+			break
+		}
 		iFloat := (float32(raw[i]) - 127.5) / 127.5
 		qFloat := (float32(raw[i+1]) - 127.5) / 127.5
-		buf.samples[i/2] = Sample(complex(iFloat, qFloat))
+		out.SetSample(dstIdx, Sample(complex(iFloat, qFloat)))
+		dstIdx++
 	}
-	return buf, nil
+
+	out.size = dstIdx
+	out.samples = out.samples[:dstIdx]
+
+	return nil
 }
 
-func (sb *Signal) Size() int                 { return sb.size }
-func (sb *Signal) SampleRate() SampleRate    { return sb.sampleRate }
-func (sb *Signal) CenterFreq() Frequency     { return sb.centerFreq }
-func (sb *Signal) Samples() []Sample         { return sb.samples }
-func (sb *Signal) GetSample(n int) Sample    { return sb.samples[n] }
-func (sb *Signal) SetSample(n int, s Sample) { sb.samples[n] = s }
+func (s *Signal) Size() int {
+	return s.size
+}
+
+func (s *Signal) Samples() []Sample {
+	return s.samples
+}
+
+func (s *Signal) SampleRate() SampleRate {
+	return s.sampleRate
+}
+
+func (s *Signal) Spectrum() []float32 {
+	return s.spectrum
+}
+
+func (s *Signal) GetSample(i int) Sample {
+	return s.samples[i]
+}
+
+func (s *Signal) SetSample(i int, v Sample) {
+	s.samples[i] = v
+}

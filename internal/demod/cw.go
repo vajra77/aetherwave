@@ -21,10 +21,9 @@ func NewCW(sampleRate dsp.SampleRate, toneHz float64) *CWDemodulator {
 	}
 }
 
-func (cw *CWDemodulator) Demodulate(in *dsp.Signal) []audio.Sample {
+func (cw *CWDemodulator) Process(in *dsp.Signal, out []audio.Sample) {
 	nSamples := in.Size()
 	samples := in.Samples()
-	audioOut := make([]audio.Sample, nSamples)
 
 	// Calcoliamo di quanto deve avanzare la fase della nostra nota a ogni campione
 	phaseStep := 2.0 * math.Pi * cw.toneFreq / float64(cw.sampleRate)
@@ -37,7 +36,7 @@ func (cw *CWDemodulator) Demodulate(in *dsp.Signal) []audio.Sample {
 		mixedSample := samples[i].Multiply(bfo)
 
 		// 3. Estraiamo la componente reale (I) che ora oscilla a 700 Hz se la portante era presente
-		audioOut[i] = audio.Sample(mixedSample.I())
+		out[i] = audio.Sample(mixedSample.I())
 
 		// 4. Incrementiamo la fase mantenendola nel range [0, 2*PI]
 		cw.phase += phaseStep
@@ -45,6 +44,4 @@ func (cw *CWDemodulator) Demodulate(in *dsp.Signal) []audio.Sample {
 			cw.phase -= 2.0 * math.Pi
 		}
 	}
-
-	return audioOut
 }
