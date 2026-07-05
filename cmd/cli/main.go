@@ -10,7 +10,10 @@ import (
 func main() {
 
 	cmdStr := os.Args[1]
-	cfg := config.New()
+	cfg, err := config.New()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	var cmd commands.Command
 

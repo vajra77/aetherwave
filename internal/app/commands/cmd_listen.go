@@ -28,10 +28,12 @@ func (c *listenCmd) Init(config *config.Config) {
 
 func (c *listenCmd) Run() {
 
+	fmt.Println("🎶 Radio is starting, please wait...")
+	fmt.Printf("frequency: %d kHz\n", c.config.Frequency)
 	// 1. Configura la pipeline astratta
 	rcvr := radio.NewReceiver(
-		dsp.Frequency(c.config.Frequency),
-		dsp.SampleRate(48000),
+		dsp.Frequency(c.config.Frequency*1000),
+		dsp.SampleRate(250000),
 		c.config.Mode,
 	)
 
